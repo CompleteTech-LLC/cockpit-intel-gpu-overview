@@ -1,0 +1,152 @@
+:root {
+  color-scheme: dark;
+  --gpu-bg: #111418;
+  --gpu-panel: #161a20;
+  --gpu-panel-strong: #1d232b;
+  --gpu-line: #343a40;
+  --gpu-text: #f0f0f0;
+  --gpu-muted: #b9bec5;
+  --gpu-accent: #39a5dc;
+  --gpu-accent-2: #69d48f;
+  --gpu-warning: #f0ab00;
+}
+
+body {
+  margin: 0;
+  background: var(--gpu-bg);
+  color: var(--gpu-text);
+  font-family: "RedHatText", "Noto Sans", sans-serif;
+}
+
+.gpu-page {
+  padding: 2rem;
+  max-width: 1180px;
+}
+
+.gpu-header,
+.gpu-hero,
+.metric-grid,
+.gpu-details dl {
+  display: grid;
+  gap: 1rem;
+}
+
+.gpu-header {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  margin-bottom: 1.5rem;
+}
+
+.gpu-eyebrow {
+  margin: 0 0 .25rem;
+  color: var(--gpu-accent);
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.gpu-status {
+  color: var(--gpu-muted);
+  font-size: .92rem;
+}
+
+.gpu-hero {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.metric-primary,
+.metric-grid article,
+.gpu-details {
+  background: var(--gpu-panel);
+  border: 1px solid var(--gpu-line);
+  border-radius: 6px;
+}
+
+.metric-primary {
+  padding: 1.25rem;
+}
+
+.metric-primary span,
+.metric-grid span,
+.gpu-details dt {
+  color: var(--gpu-muted);
+  font-size: .9rem;
+}
+
+.metric-primary strong {
+  display: block;
+  margin: .4rem 0 .75rem;
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.meter {
+  height: .6rem;
+  background: #0b2b3d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gpu-accent), var(--gpu-accent-2));
+  transition: width .25s ease;
+}
+
+.metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric-grid article {
+  padding: 1rem;
+}
+
+.metric-grid strong {
+  display: block;
+  margin-top: .35rem;
+  font-size: 1.45rem;
+}
+
+.gpu-details {
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.gpu-details dl {
+  margin: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gpu-details dt,
+.gpu-details dd {
+  margin: 0;
+}
+
+.gpu-details dd {
+  margin-top: .25rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .gpu-page {
+    padding: 1rem;
+  }
+
+  .gpu-header,
+  .gpu-hero,
+  .metric-grid,
+  .gpu-details dl {
+    grid-template-columns: 1fr;
+  }
+}
+

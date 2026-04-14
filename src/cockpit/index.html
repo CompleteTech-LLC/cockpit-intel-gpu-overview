@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GPU</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="gpu.css">
+  <script src="../base1/cockpit.js"></script>
+</head>
+<body>
+  <main class="gpu-page">
+    <header class="gpu-header">
+      <div>
+        <p class="gpu-eyebrow">Intel GPU</p>
+        <h1 id="gpu-title">GPU</h1>
+      </div>
+      <div class="gpu-status" id="gpu-status">Waiting for telemetry</div>
+    </header>
+
+    <section class="gpu-hero">
+      <article class="metric-primary">
+        <span>Utilization</span>
+        <strong id="gpu-util">--%</strong>
+        <div class="meter"><span id="gpu-util-meter"></span></div>
+      </article>
+      <article class="metric-primary">
+        <span>Memory</span>
+        <strong id="gpu-memory">--</strong>
+        <div class="meter"><span id="gpu-memory-meter"></span></div>
+      </article>
+    </section>
+
+    <section class="metric-grid">
+      <article><span>Power</span><strong id="gpu-power">-- W</strong></article>
+      <article><span>Temperature</span><strong id="gpu-temp">-- C</strong></article>
+      <article><span>Frequency</span><strong id="gpu-frequency">-- MHz</strong></article>
+      <article><span>Render</span><strong id="gpu-render">--%</strong></article>
+      <article><span>Compute</span><strong id="gpu-compute">--%</strong></article>
+      <article><span>Copy</span><strong id="gpu-copy">--%</strong></article>
+      <article><span>Decoder</span><strong id="gpu-decoder">--%</strong></article>
+      <article><span>Encoder</span><strong id="gpu-encoder">--%</strong></article>
+    </section>
+
+    <section class="gpu-details">
+      <dl>
+        <div><dt>PCI address</dt><dd id="gpu-pci">--</dd></div>
+        <div><dt>DRM device</dt><dd id="gpu-drm">--</dd></div>
+        <div><dt>Last sample</dt><dd id="gpu-updated">--</dd></div>
+      </dl>
+    </section>
+  </main>
+  <script src="gpu.js"></script>
+</body>
+</html>
+

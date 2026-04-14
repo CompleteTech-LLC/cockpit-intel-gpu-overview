@@ -1,0 +1,37 @@
+.ct-intel-gpu-overview-row {
+  display: grid;
+  grid-template-columns: 90px minmax(70px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 28px;
+  border-top: 1px solid var(--pf-v5-global--BorderColor--100, #3c3f42);
+  padding: 8px 0 0;
+  margin-top: 8px;
+  color: var(--pf-v5-global--Color--100, #f0f0f0);
+  font-size: 14px;
+}
+
+.ct-intel-gpu-overview-label {
+  white-space: nowrap;
+}
+
+.ct-intel-gpu-overview-meter {
+  height: 7px;
+  min-width: 70px;
+  background: #10324a;
+  overflow: hidden;
+}
+
+.ct-intel-gpu-overview-meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: #39a5dc;
+  transition: width .25s ease;
+}
+
+.ct-intel-gpu-overview-value {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+

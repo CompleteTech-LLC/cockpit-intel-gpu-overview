@@ -1,0 +1,36 @@
+{
+  "name": "intel-gpu",
+  "version": 1,
+  "requires": {
+    "cockpit": "265"
+  },
+  "menu": {
+    "index": {
+      "label": "GPU",
+      "order": 35,
+      "path": "index.html",
+      "keywords": [
+        {
+          "matches": [
+            "gpu",
+            "intel",
+            "arc",
+            "b60",
+            "xpu",
+            "utilization",
+            "graphics",
+            "temperature",
+            "power"
+          ]
+        }
+      ]
+    }
+  },
+  "conditions": [
+    {
+      "path-exists": "/run/cockpit-intel-gpu/metrics.json"
+    }
+  ],
+  "content-security-policy": "img-src 'self' data:"
+}
+
