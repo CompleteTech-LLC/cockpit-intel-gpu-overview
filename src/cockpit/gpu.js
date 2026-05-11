@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const file = cockpit.file("/run/cockpit-intel-gpu/metrics.json", { syntax: JSON });
+  const SYSTEM_METRICS = "/run/cockpit-intel-gpu/metrics.json";
+  const USER_METRICS = ".cache/cockpit-intel-gpu/metrics.json";
+  let file = null;
 
   function value(metric, suffix, digits) {
     if (metric === null || metric === undefined) {
@@ -62,14 +64,33 @@
     }
   }
 
-  file.watch((content, tag, error) => {
-    if (error) {
-      set("gpu-status", error.message || String(error));
-      return;
+  function watchMetrics(paths, index) {
+    if (file) {
+      file.close();
     }
-    render(content);
+    file = cockpit.file(paths[index], { syntax: JSON });
+    let initial = true;
+    file.watch((content, tag, error) => {
+      if ((error || content === null) && initial && index + 1 < paths.length) {
+        watchMetrics(paths, index + 1);
+        return;
+      }
+      initial = false;
+      if (error) {
+        set("gpu-status", error.message || String(error));
+        return;
+      }
+      render(content);
+    });
+  }
+
+  cockpit.user()
+          .then(user => watchMetrics([SYSTEM_METRICS, `${user.home}/${USER_METRICS}`], 0))
+          .catch(() => watchMetrics([SYSTEM_METRICS], 0));
+
+  window.addEventListener("unload", () => {
+    if (file) {
+      file.close();
+    }
   });
-
-  window.addEventListener("unload", () => file.close());
 }());
-

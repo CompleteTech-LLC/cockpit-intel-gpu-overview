@@ -1,0 +1,92 @@
+.ct-intel-gpu-metrics-card .pf-v5-c-card__body {
+  display: flex;
+}
+
+.ct-intel-gpu-metrics-stack {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.ct-intel-gpu-metrics-row {
+  display: grid;
+  gap: 6px;
+}
+
+.ct-intel-gpu-metrics-row > div {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ct-intel-gpu-metrics-row span,
+.ct-intel-gpu-metrics-details dt {
+  color: var(--pf-v5-global--Color--200, #6a6e73);
+  font-size: var(--pf-v5-global--FontSize--sm, 14px);
+}
+
+.ct-intel-gpu-metrics-row strong,
+.ct-intel-gpu-metrics-details dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.ct-intel-gpu-metrics-meter {
+  height: 7px;
+  background: #d2e9f7;
+  overflow: hidden;
+}
+
+.pf-v5-theme-dark .ct-intel-gpu-metrics-meter {
+  background: #10324a;
+}
+
+.ct-intel-gpu-metrics-meter > span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: #0066cc;
+  transition: width .25s ease;
+}
+
+.ct-intel-gpu-metrics-memory .ct-intel-gpu-metrics-meter > span {
+  background: #3e8635;
+}
+
+.ct-intel-gpu-metrics-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding-top: 2px;
+}
+
+.ct-intel-gpu-metrics-details dt,
+.ct-intel-gpu-metrics-details dd {
+  margin: 0;
+}
+
+.metrics-graphs.ct-intel-gpu-history-graphs {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.metrics-heading-graphs .ct-intel-gpu-history-label {
+  min-width: 0;
+}
+
+.ct-intel-gpu-history-data {
+  position: relative;
+}
+
+.ct-intel-gpu-history-bar {
+  background: #0066cc;
+  bottom: 0;
+  height: 0%;
+  left: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.ct-intel-gpu-history-data-memory .ct-intel-gpu-history-bar {
+  background: #3e8635;
+}

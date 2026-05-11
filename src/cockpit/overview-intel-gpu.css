@@ -1,6 +1,6 @@
 .ct-intel-gpu-overview-row {
   display: grid;
-  grid-template-columns: 90px minmax(70px, 1fr) auto;
+  grid-template-columns: 110px minmax(70px, 1fr) auto;
   gap: 12px;
   align-items: center;
   min-height: 28px;
@@ -9,6 +9,12 @@
   margin-top: 8px;
   color: var(--pf-v5-global--Color--100, #f0f0f0);
   font-size: 14px;
+}
+
+.ct-intel-gpu-overview-row + .ct-intel-gpu-overview-row {
+  border-top: 0;
+  padding-top: 2px;
+  margin-top: 0;
 }
 
 .ct-intel-gpu-overview-label {
@@ -35,3 +41,67 @@
   font-variant-numeric: tabular-nums;
 }
 
+.ct-intel-gpu-card .pf-v5-c-card__body {
+  display: flex;
+}
+
+.ct-intel-gpu-card-stack {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.ct-intel-gpu-card-metric {
+  display: grid;
+  gap: 6px;
+}
+
+.ct-intel-gpu-card-metric > div {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ct-intel-gpu-card-metric span,
+.ct-intel-gpu-card-details dt {
+  color: var(--pf-v5-global--Color--200, #b9bec5);
+  font-size: 13px;
+}
+
+.ct-intel-gpu-card-metric strong,
+.ct-intel-gpu-card-details dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.ct-intel-gpu-card-meter {
+  height: 7px;
+  background: #10324a;
+  overflow: hidden;
+}
+
+.ct-intel-gpu-card-meter > span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: #39a5dc;
+  transition: width .25s ease;
+}
+
+.ct-intel-gpu-card-memory .ct-intel-gpu-card-meter > span,
+.ct-intel-gpu-overview-row-memory .ct-intel-gpu-overview-meter span {
+  background: #69d48f;
+}
+
+.ct-intel-gpu-card-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding-top: 2px;
+}
+
+.ct-intel-gpu-card-details dt,
+.ct-intel-gpu-card-details dd {
+  margin: 0;
+}

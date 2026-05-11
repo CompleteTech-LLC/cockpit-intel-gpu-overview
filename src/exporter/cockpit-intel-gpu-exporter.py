@@ -12,9 +12,11 @@ import time
 
 
 DEFAULT_OUTPUT = "/run/cockpit-intel-gpu/metrics.json"
+DEFAULT_HISTORY_MINUTES = 2880
 DEFAULT_INTERVAL = 2.0
 DEVICE_ID = "0"
 METRICS = "0,1,2,3,5,18,22,23,24,25,26"
+DRM_DEVICE = "/sys/class/drm/card0/device"
 
 
 def now_iso():
@@ -29,6 +31,50 @@ def parse_number(value):
         return float(value)
     except ValueError:
         return None
+
+
+def read_float(path):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return float(handle.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def sample_sysfs_gpu():
+    device = os.path.realpath(DRM_DEVICE)
+    now = time.monotonic()
+    samples = []
+    for gt in ("gt0", "gt1"):
+        idle = read_float(os.path.join(device, "tile0", gt, "gtidle", "idle_residency_ms"))
+        if idle is not None:
+            samples.append(idle)
+    return {"time": now, "idle_ms": samples}
+
+
+def sysfs_gpu_util_percent(before, after):
+    if not before or not after:
+        return None
+    elapsed_ms = (after["time"] - before["time"]) * 1000
+    if elapsed_ms <= 0:
+        return None
+
+    busy = []
+    for old_idle, new_idle in zip(before["idle_ms"], after["idle_ms"]):
+        idle_delta = max(0, new_idle - old_idle)
+        busy.append(100 - min(100, (idle_delta / elapsed_ms) * 100))
+    if not busy:
+        return None
+    return max(0, min(100, max(busy)))
+
+
+def sysfs_temperature_c():
+    device = os.path.realpath(DRM_DEVICE)
+    for name in ("temp2_input", "temp3_input"):
+        value = read_float(os.path.join(device, "hwmon", "hwmon5", name))
+        if value is not None:
+            return value / 1000
+    return None
 
 
 def write_json(path, payload):
@@ -46,6 +92,42 @@ def write_json(path, payload):
             os.unlink(tmp)
 
 
+def history_path(output):
+    return os.path.join(os.path.dirname(output), "history.json")
+
+
+def load_history(path):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    samples = data.get("samples") if isinstance(data, dict) else None
+    return samples if isinstance(samples, list) else []
+
+
+def update_history(path, payload, limit):
+    if not payload.get("ok"):
+        return
+
+    minute = int(time.time() // 60) * 60
+    sample = {
+        "time_ms": minute * 1000,
+        "timestamp": dt.datetime.fromtimestamp(minute, dt.timezone.utc).isoformat(timespec="seconds"),
+        "utilization_percent": payload.get("utilization_percent"),
+        "memory_util_percent": payload.get("memory_util_percent"),
+        "memory_used_mib": payload.get("memory_used_mib"),
+        "memory_total_mib": payload.get("memory_total_mib"),
+    }
+
+    samples = [item for item in load_history(path) if isinstance(item, dict) and item.get("time_ms") != sample["time_ms"]]
+    samples.append(sample)
+    cutoff = sample["time_ms"] - (limit - 1) * 60 * 1000
+    samples = [item for item in samples if item.get("time_ms", 0) >= cutoff]
+    samples.sort(key=lambda item: item.get("time_ms", 0))
+    write_json(path, {"samples": samples})
+
+
 def run_command(args, timeout=15):
     return subprocess.run(
         args,
@@ -59,16 +141,33 @@ def run_command(args, timeout=15):
 
 def discover():
     try:
-        result = run_command(["xpu-smi", "discovery", "-d", DEVICE_ID])
+        result = run_command(["xpu-smi", "discovery", "-d", DEVICE_ID, "-j"])
+        data = json.loads(result.stdout)
     except Exception as exc:
-        return {"error": str(exc)}
+        data = None
+        error = str(exc)
+    else:
+        error = None
+
+    if data:
+        memory_total = None
+        memory_total_bytes = parse_number(str(data.get("memory_physical_size_byte", "")))
+        if memory_total_bytes is not None:
+            memory_total = memory_total_bytes / 1024 / 1024
+
+        return {
+            "device_name": data.get("device_name", "Intel GPU"),
+            "pci_bdf": data.get("pci_bdf_address"),
+            "drm_device": data.get("drm_device"),
+            "memory_total_mib": memory_total,
+        }
+
+    try:
+        result = run_command(["xpu-smi", "discovery"])
+    except Exception:
+        return {"error": error}
 
     text = result.stdout
-    if "DRM Device" not in text:
-        try:
-            text += "\n" + run_command(["xpu-smi", "discovery"]).stdout
-        except Exception:
-            pass
 
     fields = {}
     for key in ["Device Name", "PCI BDF Address", "DRM Device", "Memory Physical Size"]:
@@ -128,6 +227,7 @@ def parse_dump(output):
 
 
 def collect(discovery):
+    sysfs_before = sample_sysfs_gpu()
     result = run_command([
         "xpu-smi",
         "dump",
@@ -140,7 +240,12 @@ def collect(discovery):
         "-n",
         "1",
     ])
+    sysfs_after = sample_sysfs_gpu()
     metrics = parse_dump(result.stdout)
+    if metrics.get("utilization_percent") is None:
+        metrics["utilization_percent"] = sysfs_gpu_util_percent(sysfs_before, sysfs_after)
+    if metrics.get("temperature_c") is None:
+        metrics["temperature_c"] = sysfs_temperature_c()
     metrics.update(discovery)
     metrics["ok"] = True
     return metrics
@@ -149,9 +254,12 @@ def collect(discovery):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    parser.add_argument("--history-output")
+    parser.add_argument("--history-minutes", type=int, default=DEFAULT_HISTORY_MINUTES)
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
+    history_output = args.history_output or history_path(args.output)
 
     device = discover()
 
@@ -167,6 +275,7 @@ def main():
             print(f"collection failed: {exc}", file=sys.stderr, flush=True)
 
         write_json(args.output, payload)
+        update_history(history_output, payload, args.history_minutes)
         if args.once:
             return 0 if payload.get("ok") else 1
         time.sleep(args.interval)

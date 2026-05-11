@@ -4,8 +4,9 @@ Small Cockpit extension for showing Intel Arc Pro B60 telemetry in Cockpit.
 
 The project has two parts:
 
-- A root-owned systemd exporter that polls `xpu-smi` and writes read-only JSON to `/run/cockpit-intel-gpu/metrics.json`.
-- A Cockpit package that renders the telemetry as a GPU page and inserts a compact GPU row into the Overview page Usage card.
+- A root-owned systemd exporter that polls `xpu-smi` and writes read-only JSON to `/run/cockpit-intel-gpu/metrics.json` plus minute history to `/run/cockpit-intel-gpu/history.json`.
+- A Cockpit package that renders the telemetry as a GPU page, inserts separate GPU and GPU memory rows into the Overview page Usage card, adds a standalone Overview GPU card, and adds a GPU card to the Metrics page.
+- The upstream Cockpit Sensors package backed by `lm-sensors` for host temperature, fan, voltage, and power-style values exposed through the kernel hwmon stack.
 
 The exporter runs as root because Intel GPU utilization and temperature metrics require MEI device access on this host.
 
@@ -19,18 +20,22 @@ sudo ./scripts/install.sh
 
 Then refresh the Cockpit browser tab.
 
+This host currently uses `xpu-smi` from the Intel graphics package feed. Intel's full `xpumanager` package conflicts with `xpu-smi`, so do not install both on the same system. Keep `xpu-smi` for the Cockpit page unless you explicitly want to switch to the full XPU Manager daemon for REST/Prometheus workflows.
+
 ## Files Installed
 
 - `/usr/local/libexec/cockpit-intel-gpu-exporter`
 - `/etc/systemd/system/cockpit-intel-gpu-exporter.service`
 - `/usr/local/share/cockpit/intel-gpu/`
+- `/usr/share/cockpit/sensors/`
 - `/usr/share/cockpit/systemd/overview-intel-gpu.js`
 - `/usr/share/cockpit/systemd/overview-intel-gpu.css`
-- A small script/style reference in `/usr/share/cockpit/systemd/index.html`
+- `/usr/share/cockpit/metrics/metrics-intel-gpu.js`
+- `/usr/share/cockpit/metrics/metrics-intel-gpu.css`
+- Small script/style references in `/usr/share/cockpit/systemd/index.html` and `/usr/share/cockpit/metrics/index.html`
 
 ## Uninstall
 
 ```bash
 sudo ./scripts/uninstall.sh
 ```
-
