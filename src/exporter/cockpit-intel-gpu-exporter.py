@@ -15,7 +15,11 @@ DEFAULT_OUTPUT = "/run/cockpit-intel-gpu/metrics.json"
 DEFAULT_HISTORY_MINUTES = 2880
 DEFAULT_INTERVAL = 2.0
 DEVICE_ID = "0"
-METRICS = "0,1,2,3,5,18,22,23,24,25,26"
+METRICS = "MEMORY,UTILIZATION,TEMPERATURE,POWER,CLOCK"
+METRICS_FALLBACK = (
+    METRICS,
+    "all",
+)
 DRM_DEVICE = "/sys/class/drm/card0/device"
 
 
@@ -139,15 +143,111 @@ def run_command(args, timeout=15):
     )
 
 
+def extract_json_payload(text):
+    if not text:
+        return ""
+    start = text.find("{")
+    if start == -1:
+        return ""
+    end = text.rfind("}")
+    if end == -1 or end < start:
+        return ""
+    return text[start : end + 1]
+
+
+def _collect_discovery_indices_from_text(text):
+    ids = []
+    seen = set()
+    for value in re.findall(r"(?i)\b(?:Device(?:\s+ID|\s+Id)|Device(?:\s+Index))\s*:\s*(\d+)", text):
+        index = int(value)
+        if index not in seen:
+            ids.append(index)
+            seen.add(index)
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or "Timestamp" in stripped or "Device" in stripped:
+            continue
+        match = re.match(r"^(\d+)\s*[| \t]", stripped)
+        if match:
+            index = int(match.group(1))
+            if index not in seen:
+                ids.append(index)
+                seen.add(index)
+
+    return ids
+
+
+def _collect_discovery_indices_from_json(payload):
+    if not isinstance(payload, (dict, list)):
+        return []
+
+    candidate_keys = (
+        "device_id",
+        "deviceid",
+        "card_id",
+        "cardid",
+        "id",
+        "index",
+        "deviceindex",
+    )
+    ids = []
+    seen = set()
+
+    def visit(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if isinstance(key, str) and any(k == key.lower().replace("_", "").replace("-", "") for k in candidate_keys):
+                    try:
+                        index = int(str(value).strip())
+                    except (TypeError, ValueError):
+                        continue
+                    if index >= 0 and index not in seen:
+                        ids.append(index)
+                        seen.add(index)
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(payload)
+    return ids
+
+
+def discover_indices():
+    try:
+        result = run_command(["xpu-smi", "discovery"])
+    except Exception:
+        return [0]
+
+    text = result.stdout
+    ids = _collect_discovery_indices_from_text(text)
+    if not ids and text:
+        try:
+            payload = json.loads(extract_json_payload(text))
+        except Exception:
+            payload = None
+        if payload is not None:
+            ids = _collect_discovery_indices_from_json(payload)
+    return ids if ids else [0]
+
+
 def discover():
+    discovery_output = ""
     try:
         result = run_command(["xpu-smi", "discovery", "-d", DEVICE_ID, "-j"])
-        data = json.loads(result.stdout)
+        discovery_output = result.stdout
+        discovery_json = extract_json_payload(discovery_output)
+        data = json.loads(discovery_json) if discovery_json else None
     except Exception as exc:
         data = None
         error = str(exc)
     else:
         error = None
+
+    device_indices = _collect_discovery_indices_from_text(discovery_output)
+    if not device_indices and data:
+        device_indices = _collect_discovery_indices_from_json(data)
 
     if data:
         memory_total = None
@@ -159,13 +259,21 @@ def discover():
             "device_name": data.get("device_name", "Intel GPU"),
             "pci_bdf": data.get("pci_bdf_address"),
             "drm_device": data.get("drm_device"),
+            "device_indices": device_indices or [0],
             "memory_total_mib": memory_total,
         }
 
     try:
         result = run_command(["xpu-smi", "discovery"])
     except Exception:
-        return {"error": error}
+        return {
+            "device_name": "Intel GPU",
+            "pci_bdf": None,
+            "drm_device": None,
+            "device_indices": [0],
+            "memory_total_mib": None,
+            "error": error,
+        }
 
     text = result.stdout
 
@@ -180,14 +288,79 @@ def discover():
         memory_total = parse_number(fields["Memory Physical Size"].replace("MiB", ""))
 
     return {
-        "device_name": fields.get("Device Name", "Intel GPU"),
-        "pci_bdf": fields.get("PCI BDF Address"),
-        "drm_device": fields.get("DRM Device"),
-        "memory_total_mib": memory_total,
-    }
+            "device_name": fields.get("Device Name", "Intel GPU"),
+            "pci_bdf": fields.get("PCI BDF Address"),
+            "drm_device": fields.get("DRM Device"),
+            "device_indices": device_indices or [0],
+            "memory_total_mib": memory_total,
+        }
+
+
+def sample_dump():
+    indices = discover_indices()
+    errors = []
+
+    for index in indices:
+        for metrics in METRICS_FALLBACK:
+            try:
+                result = run_command([
+                    "xpu-smi",
+                    "dump",
+                    "--json",
+                    "--device",
+                    str(index),
+                    "--metrics",
+                    metrics,
+                    "--number",
+                    "1",
+                ])
+                return parse_dump(result.stdout)
+            except Exception as exc:
+                message = str(exc)
+                if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+                    message = f"{message}; stderr: {exc.stderr.strip()}"
+                errors.append(f"i={index},m={metrics}: {message}")
+
+    raise RuntimeError("; ".join(errors) or "xpu-smi dump failed")
 
 
 def parse_dump(output):
+    data = None
+    try:
+        payload = extract_json_payload(output)
+        if payload:
+            data = json.loads(payload)
+    except Exception:
+        data = None
+
+    if isinstance(data, dict):
+        metrics = data.get("metrics")
+        if isinstance(metrics, dict):
+            timestamp = str(data.get("timestamp", "")).strip()
+            device_id = str(data.get("device", data.get("DeviceId", ""))).strip()
+
+            def pick(*names):
+                for name in names:
+                    if name in metrics:
+                        return parse_number(metrics[name])
+                return None
+
+            return {
+                "timestamp": timestamp,
+                "device_id": device_id,
+                "utilization_percent": pick("utilization.gpu"),
+                "power_watts": pick("power.draw"),
+                "frequency_mhz": pick("clocks.current.graphics", "clocks.max.graphics"),
+                "temperature_c": pick("temperature.gpu"),
+                "memory_util_percent": pick("utilization.memory"),
+                "memory_used_mib": pick("memory.used"),
+                "compute_percent": pick("utilization.compute"),
+                "render_percent": pick("utilization.render"),
+                "decoder_percent": pick("utilization.media"),
+                "encoder_percent": pick("utilization.media"),
+                "copy_percent": pick("utilization.copy"),
+            }
+
     lines = [line.strip() for line in output.splitlines() if line.strip()]
     if len(lines) < 2:
         raise ValueError("xpu-smi dump returned no metric rows")
@@ -228,20 +401,8 @@ def parse_dump(output):
 
 def collect(discovery):
     sysfs_before = sample_sysfs_gpu()
-    result = run_command([
-        "xpu-smi",
-        "dump",
-        "-d",
-        DEVICE_ID,
-        "-m",
-        METRICS,
-        "-i",
-        "1",
-        "-n",
-        "1",
-    ])
     sysfs_after = sample_sysfs_gpu()
-    metrics = parse_dump(result.stdout)
+    metrics = sample_dump()
     if metrics.get("utilization_percent") is None:
         metrics["utilization_percent"] = sysfs_gpu_util_percent(sysfs_before, sysfs_after)
     if metrics.get("temperature_c") is None:
