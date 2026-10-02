@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.jpg" alt="An isometric graphics card on a server rack sending glowing telemetry traces up into floating gauge, temperature and line-chart dashboards." width="100%"></p>
+
 # Cockpit Intel GPU Overview
 
 Small Cockpit extension for showing Intel Arc Pro B60 telemetry in Cockpit.
