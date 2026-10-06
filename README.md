@@ -2,7 +2,7 @@
 
 # Cockpit Intel GPU Overview
 
-Cockpit extension that shows Intel Arc Pro B60 GPU telemetry collected from `xpu-smi`, for Linux hosts that already run Cockpit. It was written for one host and has not been tested on other GPUs or distributions, so treat it as an early prototype.
+Cockpit extension that shows Intel Arc Pro B60 GPU telemetry collected from `xpu-smi`, for Linux hosts that already run Cockpit. It was written for one host (an Arc Pro B60 on an apt-based Linux system); other hardware and distributions are not covered here.
 
 The project has three parts:
 
