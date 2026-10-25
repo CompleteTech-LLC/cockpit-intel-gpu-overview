@@ -42,7 +42,7 @@ class CollectTests(unittest.TestCase):
             nonlocal clock
             calls.append("dump")
             clock += 1.0
-            return {"utilization_percent": None, "temperature_c": 30.0}
+            return {"device_id": "0", "utilization_percent": None, "temperature_c": 30.0}
 
         with patch.object(exporter, "sample_sysfs_gpu", side_effect=sample), patch.object(
             exporter, "sample_dump", side_effect=dump
@@ -58,7 +58,7 @@ class CollectTests(unittest.TestCase):
 
     def test_reported_zero_values_are_not_replaced(self):
         with patch.object(exporter, "sample_sysfs_gpu", return_value={}), patch.object(
-            exporter, "sample_dump", return_value={"utilization_percent": 0.0, "temperature_c": 0.0}
+            exporter, "sample_dump", return_value={"device_id": "0", "utilization_percent": 0.0, "temperature_c": 0.0}
         ), patch.object(exporter, "sysfs_gpu_util_percent") as util, patch.object(
             exporter, "sysfs_temperature_c"
         ) as temperature:
@@ -72,7 +72,7 @@ class CollectTests(unittest.TestCase):
     def test_missing_metrics_use_sysfs_fallbacks(self):
         samples = [{"time": 1.0, "idle_ms": [100]}, {"time": 2.0, "idle_ms": [850]}]
         with patch.object(exporter, "sample_sysfs_gpu", side_effect=samples), patch.object(
-            exporter, "sample_dump", return_value={"utilization_percent": None, "temperature_c": None}
+            exporter, "sample_dump", return_value={"device_id": "0", "utilization_percent": None, "temperature_c": None}
         ), patch.object(exporter, "sysfs_temperature_c", return_value=46.75) as temperature:
             metrics = exporter.collect({})
 
@@ -83,7 +83,7 @@ class CollectTests(unittest.TestCase):
     def test_unavailable_sysfs_leaves_metrics_missing(self):
         samples = [{"time": 1.0, "idle_ms": []}, {"time": 2.0, "idle_ms": []}]
         with patch.object(exporter, "sample_sysfs_gpu", side_effect=samples), patch.object(
-            exporter, "sample_dump", return_value={"utilization_percent": None, "temperature_c": None}
+            exporter, "sample_dump", return_value={"device_id": "0", "utilization_percent": None, "temperature_c": None}
         ), patch.object(exporter, "sysfs_temperature_c", return_value=None):
             metrics = exporter.collect({})
 

@@ -20,6 +20,7 @@ METRICS_FALLBACK = (
     METRICS,
     "all",
 )
+LEGACY_METRICS = "0,1,2,3,5,18,22,23,24,25,26"
 DRM_DEVICE = "/sys/class/drm/card0/device"
 
 
@@ -166,9 +167,9 @@ def _collect_discovery_indices_from_text(text):
 
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or "Timestamp" in stripped or "Device" in stripped:
+        if not stripped or "Timestamp" in stripped:
             continue
-        match = re.match(r"^(\d+)\s*[| \t]", stripped)
+        match = re.match(r"^(?:\|\s*)?(\d+)\s*[| \t]", stripped)
         if match:
             index = int(match.group(1))
             if index not in seen:
@@ -301,25 +302,33 @@ def sample_dump():
     errors = []
 
     for index in indices:
-        for metrics in METRICS_FALLBACK:
+        commands = [
+            ["xpu-smi", "dump", "--json", "--device", str(index),
+             "--metrics", metrics, "--number", "1"]
+            for metrics in METRICS_FALLBACK
+        ]
+        # Legacy daemonless xpu-smi uses numeric metrics and CSV output.
+        commands.append([
+            "xpu-smi", "dump", "-d", str(index), "-m", LEGACY_METRICS,
+            "-i", "1", "-n", "1",
+        ])
+        for command in commands:
             try:
-                result = run_command([
-                    "xpu-smi",
-                    "dump",
-                    "--json",
-                    "--device",
-                    str(index),
-                    "--metrics",
-                    metrics,
-                    "--number",
-                    "1",
-                ])
-                return parse_dump(result.stdout)
+                result = run_command(command)
+                metrics = parse_dump(result.stdout)
+                if metrics["device_id"] != str(index):
+                    raise ValueError(f"xpu-smi dump returned device {metrics['device_id']!r}, expected {index}")
+                if str(index) != DEVICE_ID and not any(
+                    value is not None for name, value in metrics.items()
+                    if name not in ("timestamp", "device_id")
+                ):
+                    raise ValueError(f"xpu-smi dump returned no usable metrics for device {index}")
+                return metrics
             except Exception as exc:
                 message = str(exc)
                 if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
                     message = f"{message}; stderr: {exc.stderr.strip()}"
-                errors.append(f"i={index},m={metrics}: {message}")
+                errors.append(f"i={index},cmd={' '.join(command)}: {message}")
 
     raise RuntimeError("; ".join(errors) or "xpu-smi dump failed")
 
@@ -402,12 +411,23 @@ def parse_dump(output):
 def collect(discovery):
     sysfs_before = sample_sysfs_gpu()
     metrics = sample_dump()
-    sysfs_after = sample_sysfs_gpu()
-    if metrics.get("utilization_percent") is None:
-        metrics["utilization_percent"] = sysfs_gpu_util_percent(sysfs_before, sysfs_after)
-    if metrics.get("temperature_c") is None:
-        metrics["temperature_c"] = sysfs_temperature_c()
-    metrics.update(discovery)
+    # Discovery metadata and sysfs paths are fixed to DEVICE_ID/card0. Do not
+    # attach them to a different device selected by the command fallback.
+    if metrics["device_id"] == DEVICE_ID:
+        sysfs_after = sample_sysfs_gpu()
+        if metrics.get("utilization_percent") is None:
+            metrics["utilization_percent"] = sysfs_gpu_util_percent(sysfs_before, sysfs_after)
+        if metrics.get("temperature_c") is None:
+            metrics["temperature_c"] = sysfs_temperature_c()
+        metrics.update(discovery)
+    else:
+        metrics.update({
+            "device_name": None,
+            "pci_bdf": None,
+            "drm_device": None,
+            "device_indices": [int(metrics["device_id"])],
+            "memory_total_mib": None,
+        })
     metrics["ok"] = True
     return metrics
 
