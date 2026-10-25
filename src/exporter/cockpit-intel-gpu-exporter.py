@@ -401,8 +401,8 @@ def parse_dump(output):
 
 def collect(discovery):
     sysfs_before = sample_sysfs_gpu()
-    sysfs_after = sample_sysfs_gpu()
     metrics = sample_dump()
+    sysfs_after = sample_sysfs_gpu()
     if metrics.get("utilization_percent") is None:
         metrics["utilization_percent"] = sysfs_gpu_util_percent(sysfs_before, sysfs_after)
     if metrics.get("temperature_c") is None:
